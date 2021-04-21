@@ -13,4 +13,6 @@
 
 > (이 레포에서)처음으로 만든 리코일 프로젝트이다. 
 
+[링크](https://github.com/Hong-JunHyeok/Recoil_Study/tree/master/recoil_js_counter)
+
 ![image](https://user-images.githubusercontent.com/48292190/115545218-81db3b80-a2de-11eb-9535-5c9949f8bbe5.png)
