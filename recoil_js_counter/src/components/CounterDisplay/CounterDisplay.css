@@ -1,0 +1,20 @@
+.CounterDisplay {
+  display: flex;
+}
+.CounterDisplay h1::before{
+    content: "현재 상태";
+    color: rgba(0,0,0,0.4);
+    display: block;
+}
+.CounterDisplay h1{
+    text-align: center;
+}
+.CounterDisplay span {
+  display: flex;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0.4;
+}
