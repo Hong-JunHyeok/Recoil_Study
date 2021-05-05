@@ -537,6 +537,267 @@ const getId = () => {
 export default App;
 ```
 
-
 그러면 정상적으로 필터링이 잘 되는 모습을 볼 수 있다.
 ![image](https://user-images.githubusercontent.com/48292190/117095374-2f4f5400-ada1-11eb-92cf-b74ff4f23edb.png)
+
+우리가 적업할 기능들은
+
+- todo 항목들의 총개수
+- 완료된 todo 항목들의 총개수
+- 완료되지 않은 todo 항목들의 총개수
+- 완료된 항목의 백분율
+
+이다.
+
+필요한 데이터를 포함하는 객체를 반환하는 selector 하나를 만드는 것이 더 쉬운 방법일것이다.
+
+```js
+const todoListStatsState = selector({
+  key: "todoListStatsState",
+  get: ({ get }) => {
+    const todoList = get(todoListState);
+    const totalNum = todoList.length;
+    const totalCompletedNum = todoList.filter((item) => item.isComplete).length;
+    const totalUncompletedNum = totalNum - totalCompletedNum;
+    const percentCompleted = totalNum === 0 ? 0 : totalCompletedNum / totalNum;
+
+    return {
+      totalNum,
+      totalCompletedNum,
+      totalUncompletedNum,
+      percentCompleted,
+    };
+  },
+});
+```
+
+아래와 같은 방법으로 말이다.
+
+```js
+function TodoListStats() {
+  const {
+    totalNum,
+    totalCompletedNum,
+    totalUncompletedNum,
+    percentCompleted,
+  } = useRecoilValue(todoListStatsState);
+
+  const formattedPercentCompleted = Math.round(percentCompleted * 100);
+
+  return (
+    <ul>
+      <li>Total items: {totalNum}</li>
+      <li>Items completed: {totalCompletedNum}</li>
+      <li>Items not completed: {totalUncompletedNum}</li>
+      <li>Percent completed: {formattedPercentCompleted}</li>
+    </ul>
+  );
+}
+```
+
+TodoListStats를 하나 만들고 렌더링을 해보자.
+
+![image](https://user-images.githubusercontent.com/48292190/117095722-14c9aa80-ada2-11eb-97c1-29b3e4e478bf.png)
+
+만들다보니 까먹은게 있다...삭제와 수정을 안만들었다...
+후딱 만들어보도록 하자
+
+```js
+function replaceItemAtIndex(arr, index, newValue) {
+  return [...arr.slice(0, index), newValue, ...arr.slice(index + 1)];
+}
+
+function removeItemAtIndex(arr, index) {
+  return [...arr.slice(0, index), ...arr.slice(index + 1)];
+}
+```
+
+우선 위와같이 수정, 삭제를 위한 유틸리티 함수를 만들어주자.
+
+replaceItemAtIndex은 수정 할 index를 인자로 받고 그 전의 배열과 index뒤에 배열을 복사한 뒤, index의 값을 끼워넣는다는 의미이다.
+
+removeItemAtIndex은 삭제할 index를 인자로 받고 그 전의 배열을 복사,index뒤의 배열을 복사 후 index의 값을 제외하겠다는 의미이다.
+
+이제 만들었으니까 사용해보도록 하자.
+
+```js
+import { useState } from "react";
+import { useRecoilState, useRecoilValue, useSetRecoilState } from "recoil";
+import {
+  todoListState,
+  todoListFilterState,
+  filteredTodoListState,
+  todoListStatsState,
+} from "./atom/todo";
+
+function App() {
+  return (
+    <div>
+      <TodoList />
+    </div>
+  );
+}
+
+function TodoList() {
+  const todoList = useRecoilValue(filteredTodoListState);
+
+  const mapTodoList = todoList.map((todoItem) => (
+    <TodoItem key={todoItem.id} item={todoItem} />
+  ));
+
+  return (
+    <>
+      <TodoListStats />
+      <TodoListFilters />
+      <TodoItemCreator />
+      <ul>{mapTodoList}</ul>
+    </>
+  );
+}
+
+function TodoItemCreator() {
+  const [inputValue, setInputValue] = useState("");
+  const setTodoList = useSetRecoilState(todoListState);
+
+  const addItem = () => {
+    setTodoList((prevTodoList) => [
+      ...prevTodoList,
+      {
+        id: getId(),
+        text: inputValue,
+        isComplete: false,
+      },
+    ]);
+    setInputValue("");
+  };
+
+  const onChange = (event) => {
+    setInputValue(event.target.value);
+  };
+
+  return (
+    <div>
+      <input type="text" value={inputValue} onChange={onChange} />
+      <button onClick={addItem}>Add</button>
+    </div>
+  );
+}
+
+function TodoListFilters() {
+  const [filter, setFilter] = useRecoilState(todoListFilterState);
+  //todoListFilterState atom을 불러옴. state와 setter함수 get
+
+  const updateFilter = ({ target: { value } }) => {
+    setFilter(value);
+  };
+  //select box가 변할때마다 updateFilter함수가 실행되면서, filter state가 바뀜
+
+  return (
+    <>
+      Filter:
+      <select value={filter} onChange={updateFilter}>
+        <option value="Show All">All</option>
+        <option value="Show Completed">Completed</option>
+        <option value="Show Uncompleted">Uncompleted</option>
+      </select>
+    </>
+  );
+}
+
+function TodoListStats() {
+  const {
+    totalNum,
+    totalCompletedNum,
+    totalUncompletedNum,
+    percentCompleted,
+  } = useRecoilValue(todoListStatsState);
+
+  const formattedPercentCompleted = Math.round(percentCompleted * 100);
+
+  return (
+    <ul>
+      <li>Total items: {totalNum}</li>
+      <li>Items completed: {totalCompletedNum}</li>
+      <li>Items not completed: {totalUncompletedNum}</li>
+      <li>Percent completed: {formattedPercentCompleted}</li>
+    </ul>
+  );
+}
+
+function TodoItem({ item }) {
+  const [toggleEdit, setToggleEdit] = useState(false);
+  const [todoList, setTodoList] = useRecoilState(todoListState);
+  const index = todoList.findIndex((listItem) => listItem === item);
+
+  const editItemText = (event) => {
+    const { value } = event.target;
+    const newList = replaceItemAtIndex(todoList, index, {
+      ...item,
+      text: value,
+    });
+
+    setTodoList(newList);
+  };
+
+  const onEdit = () => {
+    setToggleEdit(!toggleEdit);
+  };
+
+  const toggleItemCompletion = () => {
+    const newList = replaceItemAtIndex(todoList, index, {
+      ...item,
+      isComplete: !item.isComplete,
+    });
+
+    setTodoList(newList);
+  };
+
+  const deleteItem = () => {
+    const newList = removeItemAtIndex(todoList, index);
+
+    setTodoList(newList);
+  };
+
+  return (
+    <li>
+      {toggleEdit && (
+        <input type="text" value={item.text} onChange={editItemText} />
+      )}
+      {item.text}
+      <input
+        type="checkbox"
+        checked={item.isComplete}
+        onChange={toggleItemCompletion}
+      />
+      <button onClick={deleteItem}>X</button>
+      <button onClick={onEdit}> {toggleEdit ? "완료" : "수정"} </button>
+    </li>
+  );
+}
+
+function replaceItemAtIndex(arr, index, newValue) {
+  return [...arr.slice(0, index), newValue, ...arr.slice(index + 1)];
+}
+
+function removeItemAtIndex(arr, index) {
+  return [...arr.slice(0, index), ...arr.slice(index + 1)];
+}
+
+let id = 0;
+const getId = () => {
+  return id++;
+};
+
+export default App;
+```
+
+![image](https://user-images.githubusercontent.com/48292190/117099971-7fccae80-adad-11eb-9eb8-f149060b53e3.png)
+
+
+# 🎊 축하합니다! 🎊
+
+투두리스트 개념을 완벽히 이해했다면, 당신은 atom , selector를 마스터했습니다!
+이제 비동기 데이터 쿼리로 넘어가보도록 하겠습니다.
+
+# 비동기 데이터 쿼리
+
